@@ -120,43 +120,44 @@ func cmp(want, got []Row) bool {
 	return true
 }
 
-func main() {
-	// schema
-	// id string, name string, weight float64, native bool
-	db := []Row{
-		{"ostric", "Ostrich", 104.0, false},
-		{"amerob", "American Robin", 0.077, true},
-		{"baleag", "Bald Eagle", 4.74, true},
-		{"eursta", "European Starling", 0.082, true},
-		{"barswa", "Barn Swallow", 0.019, true},
-	}
+// schema
+// id string, name string, weight float64, native bool
+var db []Row = []Row{
+	{"ostric", "Ostrich", 104.0, false},
+	{"amerob", "American Robin", 0.077, true},
+	{"baleag", "Bald Eagle", 4.74, true},
+	{"eursta", "European Starling", 0.082, true},
+	{"barswa", "Barn Swallow", 0.019, true},
+}
+
+func TestBasic() {
 	native := func(r Row) bool {
 		b, _ := r[3].(bool)
 		return b
 	}
 	onlyName := func(r Row) Row {
-		return []any{r[1]}
+		return []any{r[0], r[2]}
 	}
 	want := []Row{
-		{"amerob", "American Robin", 0.077, true},
-		{"baleag", "Bald Eagle", 4.74, true},
-		{"eursta", "European Starling", 0.082, true},
-		{"barswa", "Barn Swallow", 0.019, true},
+		{"amerob", 0.077},
+		{"baleag", 4.74},
+		{"eursta", 0.082},
+		{"barswa", 0.019},
 	}
-	
+
 	got := Run(Q(
 		NewProjection(onlyName),
 		NewSelection(native),
 		NewMemoryScan(db),
 	))
 
-	for _, g := range got {
-		fmt.Println(g)
-	}
-
 	if !cmp(want, got) {
 		fmt.Printf("mis-match!\n")
 	} else {
 		fmt.Printf("ok\n")
 	}
+}
+
+func main() {
+	TestBasic()
 }
