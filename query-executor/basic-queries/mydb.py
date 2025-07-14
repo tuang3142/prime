@@ -19,8 +19,7 @@ class MemoryScan(object):
 
 
 class Projection(object):
-    """
-    Map the child records using the given map function, e.g. to return a subset
+    """ Map the child records using the given map function, e.g. to return a subset
     of the fields.
     """
     def __init__(self, proj):
