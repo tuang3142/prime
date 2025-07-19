@@ -11,7 +11,7 @@ class MemoryScan(object):
 
     def next(self):
         if self.idx >= len(self.table):
-            return None
+            return
 
         x = self.table[self.idx]
         self.idx += 1
@@ -19,14 +19,17 @@ class MemoryScan(object):
 
 
 class Projection(object):
-    """ Map the child records using the given map function, e.g. to return a subset
+    """
+    Map the child records using the given map function, e.g. to return a subset
     of the fields.
     """
     def __init__(self, proj):
-        raise NotImplementedError
+        self.proj = proj
 
     def next(self):
-        raise NotImplementedError
+        row = self.child.next()
+        if row is not None:
+            return self.proj(row)
 
 
 class Selection(object):
@@ -37,22 +40,30 @@ class Selection(object):
     SQL, and is more like the WHERE clause. We keep the naming to be consistent
     with the literature.
     """
-    def __init__(self, predicate):
-        raise NotImplementedError
+    def __init__(self, select):
+        self.select = select
 
     def next(self):
-        raise NotImplementedError
+        while True:
+            row = self.child.next() # keep on looping, don't return the false result
+            if row == None:
+                return
+            if self.select(row):
+                return row
 
 
 class Limit(object):
     """
     Return only as many as the limit, then stop
     """
-    def __init__(self, n):
-        raise NotImplementedError
+    def __init__(self, limit):
+        self.limit = limit
 
     def next(self):
-        raise NotImplementedError
+        if self.limit == 0:
+            return
+        self.limit -= 1
+        return self.child.next()
 
 
 class Sort(object):
@@ -60,10 +71,31 @@ class Sort(object):
     Sort based on the given key function
     """
     def __init__(self, key, desc=False):
-        raise NotImplementedError
+        self.key = key
+        self.desc = desc
+        self.table = []
+        self.idx = 0
+        self.sorted = False
 
     def next(self):
-        raise NotImplementedError
+        if not self.sorted:
+            r = self.child.next()
+            while r is not None:
+                self.table.append(r)
+                r = self.child.next()
+            if self.desc:
+                self.table.sort(key=lambda x: -self.key(x))
+            else:
+                self.table.sort(key=self.key)
+            self.sorted = True
+
+        if self.idx >= len(self.table):
+            return
+        r = self.table[self.idx]
+        self.idx+=1
+        return r
+
+        
 
 
 def Q(*nodes):
@@ -121,6 +153,7 @@ if __name__ == '__main__':
         ('emppen1',),
         ('wanalb',),
     )
+    print('ok')
     
     # id and weight of 3 heaviest birds
     assert tuple(run(Q(
@@ -133,5 +166,4 @@ if __name__ == '__main__':
         ('emppen1', 23.0),
         ('wanalb', 8.5),
     )
-
     print('ok')
