@@ -97,7 +97,6 @@ class Sort(object):
 
         
 
-
 def Q(*nodes):
     """
     Construct a linked list of executor nodes from the given arguments,
