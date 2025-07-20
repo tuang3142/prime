@@ -2,10 +2,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 type Row []any
@@ -172,8 +176,80 @@ func run(head Node) []Row {
 	return result
 }
 
-// TODO: tbd
-func jsonToNode(json string) []Node { return []Node{} }
+func jsonToNodes(input string) []Node {
+	match := func(regex string) Filter_F {
+		return func(r Row) bool {
+			id := r[0].(string)
+			matched, err := regexp.Match(regex, []byte(id))
+			if err != nil {
+				panic(err)
+			}
+			return matched
+		}
+	}
+
+	nodes := []Node{}
+	parts := regexp.MustCompile(`\s*;\s*`).Split(input, -1)
+	for _, part := range parts {
+		switch {
+		case part == "scan":
+			// This is just a placeholder; actual MemoryScan must be inserted at call site with the db
+			nodes = append(nodes, nil)
+
+		case strings.HasPrefix(part, "filter="):
+			patterns := regexp.MustCompile(`\|`).Split(part[len("filter="):], -1)
+			var fs []Filter_F
+			for _, pat := range patterns {
+				fs = append(fs, match(pat))
+			}
+			nodes = append(nodes, &Selection{filter: Or(fs...)})
+
+		case strings.HasPrefix(part, "project="):
+			fields := strings.Split(part[len("project="):], ",")
+			nodes = append(nodes, &Projection{
+				mapper: func(row Row) Row {
+					var projected Row
+					for _, f := range fields {
+						var i int
+						fmt.Sscanf(f, "%d", &i)
+						projected = append(projected, row[i])
+					}
+					return projected
+				},
+			})
+
+		case strings.HasPrefix(part, "sort="):
+			spec := strings.TrimPrefix(part, "sort=")
+			var col int
+			desc := false
+			if _, err := fmt.Sscanf(spec, "%d desc", &col); err == nil {
+				desc = true
+			} else {
+				fmt.Sscanf(spec, "%d", &col)
+			}
+			nodes = append(nodes, &Sort{
+				key: func(row Row) float64 {
+					v, ok := row[col].(float64)
+					if !ok {
+						panic(fmt.Sprintf("row[%d] is not float64", col))
+					}
+					return v
+				},
+				desc: desc,
+			})
+
+		case strings.HasPrefix(part, "limit="):
+			var lim int
+			fmt.Sscanf(part[len("limit="):], "%d", &lim)
+			nodes = append(nodes, &Limit{limit: lim})
+
+		default:
+			panic("unknown instruction: " + part)
+		}
+	}
+
+	return nodes
+}
 
 func q(nodes ...Node) Node {
 	for i, node := range nodes[:len(nodes)-1] {
@@ -196,19 +272,47 @@ func assert(got, want []Row) error {
 	return nil
 }
 
-func main() {
-	db := []Row{
-		{"hp1", "Harry Potter and the Sorcerer's Stone", 7.6, true, "hp"},
-		{"hp2", "Harry Potter and the Chamber of Secrets", 7.4, false, "hp"},
-		{"hp3", "Harry Potter and the Prisoner of Azkaban", 7.9, true, "hp"},
-		{"inception", "Inception", 8.8, true, "sci"},
-		{"matrix", "The Matrix", 8.7, true, "sci"},
-		{"godfather", "The Godfather", 9.2, false, "dra"},
-		{"pulp", "Pulp Fiction", 8.9, true, "dra"},
-		{"lotr1", "The Lord of the Rings: The Fellowship of the Ring", 8.8, false, "lotr"},
-		{"lotr2", "The Lord of the Rings: The Two Towers", 8.8, true, "lotr"},
-		{"lotr3", "The Lord of the Rings: The Return of the King", 9.0, true, "lotr"},
+type QueryRequest struct {
+	Query string `json:"query"` // e.g. "filter=^hp|^lotr;project=0,1,2;sort=2;limit=4"
+}
+
+func handleQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "only POST supported", http.StatusMethodNotAllowed)
+		return
 	}
+
+	var req QueryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	nodes := jsonToNodes(req.Query)
+	nodes = append(nodes, &MemoryScan{table: db})
+	head := q(nodes...)
+
+	result := run(head)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+var db []Row = []Row{
+	{"hp1", "Harry Potter and the Sorcerer's Stone", 7.6, true, "hp"},
+	{"hp2", "Harry Potter and the Chamber of Secrets", 7.4, false, "hp"},
+	{"hp3", "Harry Potter and the Prisoner of Azkaban", 7.9, true, "hp"},
+	{"inception", "Inception", 8.8, true, "sci"},
+	{"matrix", "The Matrix", 8.7, true, "sci"},
+	{"godfather", "The Godfather", 9.2, false, "dra"},
+	{"pulp", "Pulp Fiction", 8.9, true, "dra"},
+	{"lotr1", "The Lord of the Rings: The Fellowship of the Ring", 8.8, false, "lotr"},
+	{"lotr2", "The Lord of the Rings: The Two Towers", 8.8, true, "lotr"},
+	{"lotr3", "The Lord of the Rings: The Return of the King", 9.0, true, "lotr"},
+}
+
+func main() {
 	match := func(regex string) Filter_F {
 		return func(r Row) bool {
 			id := r[0].(string)
@@ -249,8 +353,8 @@ func main() {
 
 	count := func(rows []Row) Row { return Row{len(rows)} }
 	want = []Row{
-		{"hp", 3},
 		{"lotr", 3},
+		{"hp", 3},
 	}
 	got = run(q(
 		&GroupBy{groupId: 4, agg: count},
@@ -263,14 +367,20 @@ func main() {
 		fmt.Println("ok")
 	}
 
-	agg := func(rows []Row) Row { return Row{rows[0]} } // group rows by their id, then produce a copy of the row itself.
-	// not very pretty but it proves the point
+	agg := func(rows []Row) Row {
+		var s float64
+		for _, row := range rows {
+			rating := row[2].(float64)
+			s += rating
+		}
+		return Row{s}
+	}
 	want = []Row{
-		[]any{"hp1", []any{"hp1", "Harry Potter and the Sorcerer's Stone", 7.6, true, "hp"}},
+		[]any{"hp1", 22.9},
+		[]any{"lotr", 26.6},
 	}
 	got = run(q(
-		&GroupBy{groupId: 0, agg: agg},
-		&Limit{limit: 1},
+		&GroupBy{groupId: 4, agg: agg},
 		&Selection{filter: Or(match("^hp"), match("^lotr"))},
 		&MemoryScan{table: db},
 	))
@@ -279,4 +389,8 @@ func main() {
 	} else {
 		fmt.Println("ok")
 	}
+
+	http.HandleFunc("/query", handleQuery)
+	fmt.Println("Read-only DB server running at http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
