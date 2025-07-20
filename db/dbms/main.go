@@ -38,6 +38,7 @@ var db []Row = []Row{
 
 func main() {
 	runTest()
+	runTestReadFromCSV()
 	http.HandleFunc("/query", handleQuery)
 	fmt.Println("Read-only DB server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

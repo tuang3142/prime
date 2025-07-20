@@ -19,6 +19,7 @@ func (c *childAccessor) SetChild(n Node) { c.child = n }
 
 type FileScan struct {
 	childAccessor
+	file
 }
 
 func (f *FileScan) Next() Row {

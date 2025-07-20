@@ -19,6 +19,28 @@ func assert(got, want []Row) error {
 	return nil
 }
 
+func runTestReadFromCSV() {
+	isAnimation := func(r Row) bool {
+		genre, ok := r[2].(string)
+		if !ok {
+			panic("can't get genre")
+		}
+		matched, err := regexp.Match(`Animation`, []byte(genre))
+		return err != nil && matched
+	}
+	mapper := func(r Row) Row { return Row{r[1], r[2]} }
+	// TODO: isGood join with rating
+	got := run(q(
+		&Projection{mapper: mapper},
+		&Limit{limit: 5},
+		&Selection{filter: isAnimation},
+		&FileScan{},
+	))
+	for _, r := range got {
+		fmt.Println(r)
+	}
+}
+
 func runTest() {
 	match := func(regex string) FilterFunc {
 		return func(r Row) bool {
