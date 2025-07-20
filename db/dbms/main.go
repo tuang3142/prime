@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -37,8 +38,14 @@ var db []Row = []Row{
 }
 
 func main() {
-	runTest()
-	runTestReadFromCSV()
+	t := flag.Bool("t", false, "Run test")
+	flag.Parse()
+	if *t {
+		// runTest()
+		runTestReadFromCSV()
+		return
+	}
+
 	http.HandleFunc("/query", handleQuery)
 	fmt.Println("Read-only DB server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

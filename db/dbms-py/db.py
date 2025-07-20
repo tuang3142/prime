@@ -1,3 +1,18 @@
+import csv
+
+class FileScan(object):
+    def __init__(self, reader):
+        self.reader = reader
+
+    def next(self):
+        try:
+            row = next(self.reader)
+            return row
+        except StopIteration:
+            pass
+        
+
+
 class MemoryScan(object):
     """
     Yield all records from the given "table" in memory.
@@ -165,4 +180,20 @@ if __name__ == '__main__':
         ('emppen1', 23.0),
         ('wanalb', 8.5),
     )
+
+    csvfile = open('db/movies.csv', newline='')
+    reader = csv.reader(csvfile)
+    t = tuple(run(Q(
+        Projection(lambda x: (x[1])),
+        Limit(10),
+        Selection(lambda x: "Animation" in x[2]),
+        Sort(lambda x: x[1]),
+        FileScan(reader),
+    ))) 
+    # for i in t: print(i)
+    # assert t == (
+    #     ('ostric1', 104.0),
+    #     ('emppen1', 23.0),
+    #     ('wanalb', 8.5),
+    # )
     print('ok')

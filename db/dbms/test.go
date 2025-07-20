@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 )
@@ -20,25 +22,36 @@ func assert(got, want []Row) error {
 }
 
 func runTestReadFromCSV() {
-	isAnimation := func(r Row) bool {
-		genre, ok := r[2].(string)
-		if !ok {
-			panic("can't get genre")
-		}
-		matched, err := regexp.Match(`Animation`, []byte(genre))
-		return err != nil && matched
+	// TODO: isGood, join with table rating
+	genreFilter := func(r Row) bool {
+		return true
+		// genre, ok := r[2].(string)
+		// if !ok {
+		// 	panic("can't get genre")
+		// }
+		// matched, err := regexp.Match(`.*Comedy.*`, []byte(genre))
+		// return err == nil && matched
 	}
 	mapper := func(r Row) Row { return Row{r[1], r[2]} }
-	// TODO: isGood join with rating
+	file, err := os.Open("db/movies.csv") // todo: look at the python solution
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	limit := 100
+	csvReader := csv.NewReader(file)
+
 	got := run(q(
 		&Projection{mapper: mapper},
-		&Limit{limit: 5},
-		&Selection{filter: isAnimation},
-		&FileScan{},
+		&Limit{limit: limit},
+		&Selection{filter: genreFilter},
+		&FileScan{reader: csvReader},
 	))
-	for _, r := range got {
-		fmt.Println(r)
+	if len(got) != limit {
+		println("!ok :(")
+		return
 	}
+	println("ok")
 }
 
 func runTest() {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"sort"
 )
 
@@ -17,13 +18,35 @@ type childAccessor struct{ child Node }
 func (c *childAccessor) GetChild() Node  { return c.child }
 func (c *childAccessor) SetChild(n Node) { c.child = n }
 
+type Reader interface {
+	Read() ([]string, error)
+}
+
 type FileScan struct {
 	childAccessor
-	file
+	reader Reader
+	eof    bool
 }
 
 func (f *FileScan) Next() Row {
-	return Row{}
+	if f.eof {
+		return nil
+	}
+
+	record, err := f.reader.Read()
+	if err == io.EOF {
+		f.eof = true
+		return nil
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	row := make(Row, len(record))
+	for i, val := range record {
+		row[i] = val
+	}
+	return row
 }
 
 type MemoryScan struct {
