@@ -22,13 +22,27 @@ type Reader interface {
 	Read() ([]string, error)
 }
 
+type file interface {
+	Open()
+	Close()
+	Read() ([]string, error) // read from a certain position
+	// ReadAt(int)([]string, error)
+}
+
 type FileScan struct {
+	childAccessor
+	reader Reader
+}
+
+// stretch exercise: check for memeory leak?
+// file might not be closed at all
+type CSVScan struct {
 	childAccessor
 	reader Reader
 	eof    bool
 }
 
-func (f *FileScan) Next() Row {
+func (f *CSVScan) Next() Row {
 	if f.eof {
 		return nil
 	}

@@ -22,36 +22,35 @@ func assert(got, want []Row) error {
 }
 
 func runTestReadFromCSV() {
-	// TODO: isGood, join with table rating
 	genreFilter := func(r Row) bool {
-		return true
-		// genre, ok := r[2].(string)
-		// if !ok {
-		// 	panic("can't get genre")
-		// }
-		// matched, err := regexp.Match(`.*Comedy.*`, []byte(genre))
-		// return err == nil && matched
+		genre, ok := r[2].(string)
+		if !ok {
+			panic("can't get genre")
+		}
+		matched, err := regexp.Match(`.*Comedy.*`, []byte(genre))
+		return err == nil && matched
 	}
 	mapper := func(r Row) Row { return Row{r[1], r[2]} }
 	file, err := os.Open("db/movies.csv") // todo: look at the python solution
 	if err != nil {
 		panic(err)
 	}
-	defer file.Close()
-	limit := 100
+	defer func() {
+		file.Close()
+		fmt.Printf("file closed\n")
+	}() // we do close the file no matter wat.
 	csvReader := csv.NewReader(file)
-
+	want := 8374
 	got := run(q(
 		&Projection{mapper: mapper},
-		&Limit{limit: limit},
 		&Selection{filter: genreFilter},
-		&FileScan{reader: csvReader},
+		&CSVScan{reader: csvReader},
 	))
-	if len(got) != limit {
-		println("!ok :(")
-		return
+	if len(got) != want {
+		fmt.Printf("!ok, want %d, got %d\n", want, len(got))
+	} else {
+		println("ok")
 	}
-	println("ok")
 }
 
 func runTest() {
