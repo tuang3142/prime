@@ -16,14 +16,17 @@ with open(path + 'movies.csv', 'r') as f:
             for typ, val in zip(schema, row):
                 if typ == 'uint32':
                     val = int(val)
+                    # write number (id) into bytes
                     out.write(int(val).to_bytes(4, 'little')) # 4 bytes, little indian (im not racist sorry)
                 elif typ == 'text':
                     val = val.encode('utf8')
+                    # write text into bytes, this is title
                     out.write(len(val).to_bytes(1)) # 1 bytes, string, this is kinda like padding for the string
                     out.write(val)
                 else:
                     raise ValueError('unknown type')
 
+# decoding
 with open(path + 'movies.dat', 'rb') as f:
     for  _ in range(1000):
         for typ in schema:
