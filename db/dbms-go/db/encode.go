@@ -4,6 +4,8 @@
 package main
 
 import (
+	"fmt"
+
 	"encoding/binary"
 	"encoding/csv"
 	"io"
@@ -64,7 +66,7 @@ func encode() {
 			case "string":
 				// first write the length of the string, for decoding purpose
 				// use only 1 byte (8 bits) to store the length tho
-				buf := make([]byte, 1) // 8 bit, store up to 2^8
+				buf := make([]byte, 4) // 8 bit, store up to 2^8
 				binary.LittleEndian.PutUint32(buf, uint32(len(stringVal)))
 				if _, err := out.Write(buf); err != nil {
 					log.Fatalf("Failed to write %v: %v", buf, err)
@@ -96,15 +98,16 @@ func decode() {
 			case "int":
 				buf := make([]byte, 4)
 				io.ReadFull(out, buf)
-				println(binary.LittleEndian.Uint32(buf))
+				fmt.Print(binary.LittleEndian.Uint32(buf), " ")
 			case "string":
-				buf := make([]byte, 1) // read the length of the string
+				buf := make([]byte, 4) // read the length of the string, why does this needs to be 4?
+				// in the python example it is only 1
 				io.ReadFull(out, buf)
 				l := binary.LittleEndian.Uint32(buf)
-				println(l)
+				fmt.Print(l, " ")
 				buf = make([]byte, l)
 				io.ReadFull(out, buf)
-				println(string(buf))
+				fmt.Println(string(buf))
 			default:
 				log.Fatalf("Undefined type %v", typ)
 			}
