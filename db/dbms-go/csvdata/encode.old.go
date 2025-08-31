@@ -2,7 +2,7 @@
 // i am a capable person and gritty. i can improve myself. i'wil start with studying everyday for at
 // least 30 minutes, afterwork, following course at csprimer.com
 // todo: watch the video again, why encode that way?
-package main
+package mainn
 
 import (
 	"fmt"
