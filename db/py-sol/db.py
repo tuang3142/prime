@@ -1,7 +1,7 @@
 import csv
 
 # TODO: close file in the class
-# tmr: 
+# tmr: submit this
 class FileScanPaged(object):
     def __init__(self, inp):
         self.inp = inp
