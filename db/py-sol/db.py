@@ -1,45 +1,58 @@
 import csv
 
-# TODO: close file in the class
-# tmr: submit this
 class FileScanPaged(object):
-    def __init__(self, inp):
-        self.inp = inp
+    PAGE_SIZE = 1024 # page byte size
+    REC_COUNT_SIZE = 2 # 2 bytes for record count, saved at the beginning of the page
+    SLOT_SIZE = 2 # 2 bytes per record index in a page
+
+    def __init__(self, file:str):
+        self.file = open(file, "rb")
         self.rows = []
     
+    def close(self):
+        if self.file:
+            self.file.close()
+
     def next(self):
         if len(self.rows) == 0:
-            self.next_page()
+            self.get_next_rows()
             if len(self.rows) == 0:
+                self.close()
                 return
+
         row = self.rows[0]
         self.rows = self.rows[1:]
         return row
     
-    def next_page(self):
-        page_size = 1024
-        buffer = self.inp.read(page_size)
-        if len(buffer == 0):
+    def get_next_rows(self):
+        buffer = self.file.read(self.PAGE_SIZE)
+        if len(buffer) == 0:
             return []
         
-        rec_count = int.from_bytes(buffer[:2])
-        p = 2
-        rec_end = page_size
-        for i in range(rec_count):
-            rec_start = int.from_bytes(buffer[p : p + 2])
+        rec_count = int.from_bytes(buffer[:self.SLOT_SIZE])
+        p = self.REC_COUNT_SIZE
+        rec_end = self.PAGE_SIZE
+        for _ in range(rec_count):
+            rec_start = int.from_bytes(buffer[p : p + self.SLOT_SIZE])
             rec = buffer[rec_start:rec_end]
             row = []
-            for typ in schema:
+            for typ in ['uint32', 'text', 'text']:
                 if typ == 'uint32':
                     val = int.from_bytes(rec[:4]) # 4 bytes = 32 bit -> unsigned 32 bit int
                     row.append(val)
                     rec = rec[4:]
-                if typ == 'text':
-                    l = int.from_bytes(rec[:1])
-                    row.append(rec[1:1+l].decode('utf-8'))
-                    rec = rec[1+l:]
+                elif typ == 'text':
+                    text_len = int.from_bytes(rec[:1])
+                    text_start, text_end = 1, 1 + text_len
+                    row.append(rec[text_start:text_end].decode('utf-8'))
+                    rec = rec[text_end:]
+                else:
+                    raise ValueError(f'Unknown type {typ}')
+            p += 2
+            rec_end = rec_start
             self.rows.append(row)
         return []
+
 
 class FileScan(object):
     def __init__(self, reader):
@@ -178,7 +191,6 @@ def run(q):
 
 
 if __name__ == '__main__':
-    # Harry Potter–themed test data
     artifacts = (
         ('elderwd', 'Elder Wand', 99.0, False),
         ('philstn', "Philosopher's Stone", 95.0, False),
@@ -199,7 +211,6 @@ if __name__ == '__main__':
         ('is_dark', bool),
     )
 
-    # 1) ids of dark artifacts
     assert tuple(run(Q(
         Projection(lambda x: (x[0],)),
         Selection(lambda x: x[3]),
@@ -211,7 +222,6 @@ if __name__ == '__main__':
     )
     print('ok 1')
 
-    # 2) id and power of 3 most powerful artifacts
     assert tuple(run(Q(
         Projection(lambda x: (x[0], x[2])),
         Limit(3),
@@ -224,7 +234,6 @@ if __name__ == '__main__':
     )
     print('ok 2')
 
-    # 3) names + power of non-dark artifacts with 60 <= power < 90 (ascending by power), take 3
     assert tuple(run(Q(
         Projection(lambda x: (x[1], x[2])),
         Limit(3),
@@ -238,7 +247,6 @@ if __name__ == '__main__':
     )
     print('ok 3')
 
-    # 4) ids of artifacts whose name contains "of"
     assert tuple(run(Q(
         Projection(lambda x: (x[0],)),
         Selection(lambda x: ' of ' in x[1]),
@@ -249,7 +257,6 @@ if __name__ == '__main__':
     )
     print('ok 4')
 
-    # 5) first 5 ids alphabetically by name
     assert tuple(run(Q(
         Projection(lambda x: (x[0],)),
         Limit(5),
@@ -264,7 +271,6 @@ if __name__ == '__main__':
     )
     print('ok 5')
 
-    # 6) no artifacts above impossible power threshold → empty
     assert tuple(run(Q(
         Projection(lambda x: (x[0],)),
         Selection(lambda x: x[2] > 120.0),
@@ -272,7 +278,6 @@ if __name__ == '__main__':
     ))) == ()
     print('ok 6')
 
-    # 7) case-insensitive name match: contains "wand"
     assert tuple(run(Q(
         Projection(lambda x: (x[1],)),
         Selection(lambda x: 'wand' in x[1].lower()),
@@ -301,19 +306,20 @@ if __name__ == '__main__':
         ), f'got = {t}'
         print('ok 8')
 
-    with open('data/movies-paged.dat', 'rb') as inp:
-        schema = (
-            ('id', int),
-            ('title', str),
-            ('genres', str),
-        )
-        t = tuple(run(Q(
-            Projection(lambda x: (x[1],)),
-            Limit(2),
-            FileScanPaged(inp),
-        )))
-        assert t == (
-            ('Toy Story (1995)',),
-            ('Jumanji (1995)',),
-        ), f'got = {t}'
-        print('ok 8')
+    schema = (
+        ('id', int),
+        ('title', str),
+        ('genres', str),
+    )
+    t = tuple(run(Q(
+        Projection(lambda x: (x[1],)),
+        Limit(3),
+        Sort(lambda x: x[0], desc=True),
+        FileScanPaged('data/movies-paged.dat'),
+    )))
+    assert t == (
+        ('Innocence (2014)',),
+        ('Rentun Ruusu (2001)',),
+        ('The Pirates (2014)',)
+    ), f'got = {t}'
+    print('ok 9')
