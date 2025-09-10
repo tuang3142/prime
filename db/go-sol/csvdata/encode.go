@@ -10,43 +10,46 @@ import (
 	"strconv"
 )
 
-// plan:
-// open line by line, skip the first line because of heading
-// for each type, encode it. int: 4 byte, string: 4 byte length + remaining
+const (
+	pageSize = 1024
+	slotSize = 2
+)
 
-// int32, int64... hummm
-var schema = []string{"uint32", "string", "string"}
+var schema = []string{"uint32", "text", "text"}
 
 func encode(input, output string) error {
-	f, err := os.Open(input)
+	inp, err := os.Open(input)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
 
-	r := csv.NewReader(f)
-	_, err = r.Read()
+	r := csv.NewReader(inp)
+	_, err = r.Read() // skip header
 	if err != nil {
-		return fmt.Errorf("failed to read heading: %v", err)
+		return fmt.Errorf("failed to read header: %v", err)
 	}
 
-	out, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	out, err := os.OpenFile(output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // TODO: understand this?
 	if err != nil {
 		return fmt.Errorf("Failed to open %v: %v", out, err)
 	}
 	defer out.Close()
-	for {
-		record, err := r.Read()
+
+	page := make([]byte, pageSize)
+	recEnd := pageSize
+	recCount := 0
+	slotStart := slotSize
+	for record, err := r.Read(); err != nil; record, err = r.Read() {
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return fmt.Errorf("failed to read record: %v", err)
 		}
-		if len(record) != len(schema) {
-			return fmt.Errorf("record %v doesn't match schema %v", record, schema)
-		}
-		for i := range schema {
-			switch schema[i] {
+
+		recByte := []byte{}
+		for i, typ := range schema {
+			switch typ {
 			case "uint32":
 				intVal, err := strconv.Atoi(record[i])
 				if err != nil {
@@ -54,41 +57,60 @@ func encode(input, output string) error {
 				}
 				buf := make([]byte, 4)
 				binary.LittleEndian.PutUint32(buf, uint32(intVal))
-				if _, err := out.Write(buf); err != nil {
-					return fmt.Errorf("failed to write %v to output: %v", intVal, err)
-				}
-				fmt.Printf("printed %v to binary %#v\n", intVal, buf)
-			case "string":
+				recByte = append(recByte, buf...)
+			case "text":
 				l := len(record[i])
-				buf := make([]byte, 4)
+				buf := make([]byte, 1)
 				binary.LittleEndian.PutUint32(buf, uint32(l))
-				if _, err := out.Write(buf); err != nil {
-					return fmt.Errorf("failed to write %v to output: %v", l, err)
-				}
-				if _, err := out.Write([]byte(record[i])); err != nil {
-					return fmt.Errorf("failed to write %v to output: %v", record[i], err)
-				}
-				fmt.Printf("printed %v to file\n", record[i])
-				// fmt.Printf("byte: %#v", []byte(record[i])) - encode: char -> utf8 (int - id of sort) -> hex
+				recByte = append(recByte, buf...)
+				recByte = append(recByte, []byte(record[i])...)
 			default:
-				return fmt.Errorf("undefined type %v", schema[i])
+				return fmt.Errorf("undefined type: %v", typ)
 			}
 		}
+		recStart := recEnd - len(recByte)
+		if recStart < slotStart+slotSize {
+			if _, err := out.Write(page); err != nil {
+				return fmt.Errorf("failed to write to output: %v", err)
+			}
+			page = make([]byte, pageSize)
+			recEnd = pageSize
+			slotStart = slotSize
+			recCount = 0
+
+			recStart = recEnd - len(recByte)
+		}
+		copy(page[recStart:recEnd], recByte)
+
+		recCount += 1
+		binary.LittleEndian.PutUint16(page[:slotSize], uint16(recCount))
+		binary.LittleEndian.PutUint16(page[slotStart:slotStart+slotSize], uint16(recStart))
+
+		slotStart += 2
+		recEnd = recStart
 	}
 
 	return nil
 }
 
-// todo tmr: decode what i've just encoded
-// i just need to find an effective way to deal with stress. i can deal with uncomfortable feeling, but feelling stressed all the time is not good
-// talking to other peopl def. help. it is a way to socialize
+func lastNBytes(f *os.File, n int) {
 
-func decode(input, output string) error {
+}
+
+// TODO: testing. This is as far as I can do. I can still study polish after this
+
+func decode(input string) error {
 	ip, err := os.Open(input)
 	if err != nil {
 		return fmt.Errorf("failed to open %v: %v", input, err)
 	}
 	defer ip.Close()
+
+	info, err := ip.Stat()
+	if err != nil {
+		return err
+	}
+
 	for {
 		for _, typ := range schema {
 			switch typ {
@@ -104,7 +126,7 @@ func decode(input, output string) error {
 				}
 				fmt.Printf("%v ", binary.LittleEndian.Uint32(buf))
 				// conver to in
-			case "string":
+			case "text":
 				buf := make([]byte, 4)
 				_, err := io.ReadFull(ip, buf)
 				if err != nil {
