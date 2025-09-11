@@ -6,6 +6,22 @@ PAGE_SIZE = 1024
 COUNT_SIZE = 2
 ENDIAN = 'big'
 
+"""
+insert
+
+insert to the last page. if page is full, spawn a new page.
+
+def insert:
+    page = lastpage
+    if check page i ful(lastpage): page = new page() -> also append this to the out file (write this to the file)
+
+stretch goal:
+   handle closing file
+   insert with query
+
+"""
+
+
 def encode_row(row: list[str]):
     schema = ('int', 'text', 'text')
     b = io.BytesIO()

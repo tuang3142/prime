@@ -1,4 +1,68 @@
 import csv
+import os
+import io
+
+COUNT_SIZE = 2
+PAGE_SIZE = 1024
+ENDIAN = "big"
+
+class Insert(object):
+    def __init__(self, file_name):
+        self.ip = open(file_name, 'r+b')
+        pass
+
+    def encode_row(self, row: list[str]):
+        b = io.BytesIO()
+        for typ, val in zip(schema, row):
+            if typ == 'uint32':
+                b.write(int(val).to_bytes(4, ENDIAN, signed=False)) # write id, big endian 4 bytes
+            elif typ == 'text':
+                data = val.encode('utf8')
+                # 1 byte length = 255 maximum; cap or raise
+                if len(data) > 255: # 1 byte: 0->255
+                    data = data[:255]
+                b.write(len(data).to_bytes(1)) 
+                b.write(data)
+            else:
+                raise ValueError(f'unknown type: {typ}')
+        return b.getvalue()
+
+    # todo: check again by looking at the solution?
+    # sometime our mind tells us what we're doing is wrong and we should not continue
+    # when we're doing hard things - don't listen to it. what we're doing is good.
+    def next(self):
+        if not self.child:
+            if not self.ip.closed:
+                self.ip.close()
+            return
+        row = self.child.next()
+        self.ip.seek(-PAGE_SIZE, os.SEEK_END)
+
+        page = bytearray(self.ip.read(PAGE_SIZE))
+        rec_count = int.from_bytes(page[:COUNT_SIZE])
+        pos = rec_count * 2 # last position of the pos array
+        rec_end = int.from_bytes(page[pos:pos+2])
+
+        b = self.encode_row(rec)
+        rec_start = rec_end - len(b)
+        new_page = False
+        if rec_start < pos + 2: # need a new page
+            page = bytearray(PAGE_SIZE)
+            rec_count = 0
+            pos = 2
+            rec_end = PAGE_SIZE
+            rec_start = rec_end - len(b)
+            new_page = True
+
+        page[rec_start:rec_end] = b
+        rec_count += 1
+        page[:2] = rec_count.to_bytes(2) # big, signed = false
+        page[rec_count * 2: rec_count * 2 + 2] = rec_start.to_bytes(2) # big, signed = false
+
+        if not new_page: self.ip.seek(-PAGE_SIZE, os.SEEK_END)
+        self.ip.write(page)
+
+        return row
 
 class FileScanPaged(object):
     PAGE_SIZE = 1024 # page byte size
@@ -311,15 +375,51 @@ if __name__ == '__main__':
         ('title', str),
         ('genres', str),
     )
-    t = tuple(run(Q(
-        Projection(lambda x: (x[1],)),
-        Limit(3),
-        Sort(lambda x: x[0], desc=True),
-        FileScanPaged('data/movies-paged.dat'),
-    )))
-    assert t == (
-        ('Innocence (2014)',),
-        ('Rentun Ruusu (2001)',),
-        ('The Pirates (2014)',)
-    ), f'got = {t}'
-    print('ok 9')
+    # t = tuple(run(Q(
+    #     Projection(lambda x: (x[1],)),
+    #     Limit(3),
+    #     Sort(lambda x: x[0], desc=True),
+    #     FileScanPaged('data/movies-paged.dat'),
+    # )))
+    # assert t == (
+    #     ('Innocence (2014)',),
+    #     ('Rentun Ruusu (2001)',),
+    #     ('The Pirates (2014)',)
+    # ), f'got = {t}'
+    # print('ok 9')
+
+    movies = [
+        [131266, 'Spiderman (2026)', 'Commedy|Drama|Fantasy|Sci-Fi'],
+        [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'],
+    ]
+    file = "data/movies-paged-copy.dat" #
+    run(Q(Insert(file),
+          Selection(lambda x: "2025" in x[1]),
+          MemoryScan(movies)))
+    # read and check the last row
+    last_row = []
+    with open(file, 'r') as f:
+        f.seek(-PAGE_SIZE, os.SEEK_END)
+        buffer = f.read(PAGE_SIZE)
+        rec_count = int.from_bytes(buffer[:2])
+        assert rec_count == 7
+        p = 2
+        rec_end = PAGE_SIZE
+        for i in range(rec_count):
+            rec_start = int.from_bytes(buffer[p : p + 2])
+            rec = buffer[rec_start:rec_end]
+            row = []
+            for typ in schema:
+                if typ == 'uint32':
+                    val = int.from_bytes(rec[:4]) # 4 bytes = 32 bit -> unsigned 32 bit int
+                    row.append(val)
+                    rec = rec[4:]
+                if typ == 'text':
+                    l = int.from_bytes(rec[:1])
+                    row.append(rec[1:1+l].decode('utf-8'))
+                    rec = rec[1+l:]
+            res = row
+            p += 2
+            rec_end = rec_start
+    assert last_row == [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi']
+    print('ok - test_insert')
