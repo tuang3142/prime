@@ -6,14 +6,18 @@ COUNT_SIZE = 2
 PAGE_SIZE = 1024
 ENDIAN = "big"
 
+# todo: what i did here is pretty correct. need to debug. don't stupidly ask ai for help. this is the gym, this is practice, don't make it easy
+# TODO finish this exer
+# write on empty test file with custom schema to test it
+# todo: write this in go, with just two node: insert and read (filescanpaged)
 class Insert(object):
-    def __init__(self, file_name):
-        self.ip = open(file_name, 'r+b')
-        pass
+    def __init__(self, ip, schema):
+        self.ip = ip
+        self.schema = schema
 
     def encode_row(self, row: list[str]):
         b = io.BytesIO()
-        for typ, val in zip(schema, row):
+        for typ, val in zip(self.schema, row):
             if typ == 'uint32':
                 b.write(int(val).to_bytes(4, ENDIAN, signed=False)) # write id, big endian 4 bytes
             elif typ == 'text':
@@ -27,15 +31,14 @@ class Insert(object):
                 raise ValueError(f'unknown type: {typ}')
         return b.getvalue()
 
-    # todo: check again by looking at the solution?
-    # sometime our mind tells us what we're doing is wrong and we should not continue
-    # when we're doing hard things - don't listen to it. what we're doing is good.
     def next(self):
-        if not self.child:
-            if not self.ip.closed:
-                self.ip.close()
-            return
+        print('next is called')
+        if self.child is None: return
+
         row = self.child.next()
+        if row is None: return
+
+        print('row inside insert: ', row)
         self.ip.seek(-PAGE_SIZE, os.SEEK_END)
 
         page = bytearray(self.ip.read(PAGE_SIZE))
@@ -43,7 +46,7 @@ class Insert(object):
         pos = rec_count * 2 # last position of the pos array
         rec_end = int.from_bytes(page[pos:pos+2])
 
-        b = self.encode_row(rec)
+        b = self.encode_row(row)
         rec_start = rec_end - len(b)
         new_page = False
         if rec_start < pos + 2: # need a new page
@@ -63,6 +66,7 @@ class Insert(object):
         self.ip.write(page)
 
         return row
+
 
 class FileScanPaged(object):
     PAGE_SIZE = 1024 # page byte size
@@ -255,154 +259,141 @@ def run(q):
 
 
 if __name__ == '__main__':
-    artifacts = (
-        ('elderwd', 'Elder Wand', 99.0, False),
-        ('philstn', "Philosopher's Stone", 95.0, False),
-        ('horcrux1', "Tom Riddle's Diary", 90.0, True),
-        ('horcrux2', "Marvolo Gaunt's Ring", 88.0, True),
-        ('cloak', 'Invisibility Cloak', 70.0, False),
-        ('sword', 'Sword of Gryffindor', 85.0, False),
-        ('mapmara', "Marauder's Map", 40.0, False),
-        ('timeurn', 'Time-Turner', 75.0, False),
-        ('basilisk', 'Basilisk Fang', 60.0, False),
-        ('lktpnsn', 'Locket of Slytherin', 87.0, True),
-    )
-
-    schema = (
-        ('id', str),
-        ('name', str),
-        ('power', float),
-        ('is_dark', bool),
-    )
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[0],)),
-        Selection(lambda x: x[3]),
-        MemoryScan(artifacts),
-    ))) == (
-        ('horcrux1',),
-        ('horcrux2',),
-        ('lktpnsn',),
-    )
-    print('ok 1')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[0], x[2])),
-        Limit(3),
-        Sort(lambda x: x[2], desc=True),
-        MemoryScan(artifacts),
-    ))) == (
-        ('elderwd', 99.0),
-        ('philstn', 95.0),
-        ('horcrux1', 90.0),
-    )
-    print('ok 2')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[1], x[2])),
-        Limit(3),
-        Sort(lambda x: x[2]),
-        Selection(lambda x: (not x[3]) and (60.0 <= x[2] < 90.0)),
-        MemoryScan(artifacts),
-    ))) == (
-        ('Basilisk Fang', 60.0),
-        ('Invisibility Cloak', 70.0),
-        ('Time-Turner', 75.0),
-    )
-    print('ok 3')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[0],)),
-        Selection(lambda x: ' of ' in x[1]),
-        MemoryScan(artifacts),
-    ))) == (
-        ('sword',),
-        ('lktpnsn',),
-    )
-    print('ok 4')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[0],)),
-        Limit(5),
-        Sort(lambda x: x[1]),
-        MemoryScan(artifacts),
-    ))) == (
-        ('basilisk',),
-        ('elderwd',),
-        ('cloak',),
-        ('lktpnsn',),
-        ('mapmara',),
-    )
-    print('ok 5')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[0],)),
-        Selection(lambda x: x[2] > 120.0),
-        MemoryScan(artifacts),
-    ))) == ()
-    print('ok 6')
-
-    assert tuple(run(Q(
-        Projection(lambda x: (x[1],)),
-        Selection(lambda x: 'wand' in x[1].lower()),
-        MemoryScan(artifacts),
-    ))) == (('Elder Wand',),)
-    print('ok 7')
-
-
-    with open('data/movies.csv', 'r', newline='', encoding='UTF-8') as inp:
-        r = csv.reader(inp)
-        next(inp) # skip header
-
-        schema = (
-            ('id', int),
-            ('title', str),
-            ('genres', str),
-        )
-        t = tuple(run(Q(
-            Projection(lambda x: (x[1],)),
-            Limit(2),
-            FileScan(r),
-        )))
-        assert t == (
-            ('Toy Story (1995)',),
-            ('Jumanji (1995)',),
-        ), f'got = {t}'
-        print('ok 8')
-
-    schema = (
-        ('id', int),
-        ('title', str),
-        ('genres', str),
-    )
+    # artifacts = (
+    #     ('elderwd', 'Elder Wand', 99.0, False),
+    #     ('philstn', "Philosopher's Stone", 95.0, False),
+    #     ('horcrux1', "Tom Riddle's Diary", 90.0, True),
+    #     ('horcrux2', "Marvolo Gaunt's Ring", 88.0, True),
+    #     ('cloak', 'Invisibility Cloak', 70.0, False),
+    #     ('sword', 'Sword of Gryffindor', 85.0, False),
+    #     ('mapmara', "Marauder's Map", 40.0, False),
+    #     ('timeurn', 'Time-Turner', 75.0, False),
+    #     ('basilisk', 'Basilisk Fang', 60.0, False),
+    #     ('lktpnsn', 'Locket of Slytherin', 87.0, True),
+    # )
     # t = tuple(run(Q(
-    #     Projection(lambda x: (x[1],)),
-    #     Limit(3),
-    #     Sort(lambda x: x[0], desc=True),
-    #     FileScanPaged('data/movies-paged.dat'),
+    #     # Projection(lambda x: (x[0],)),
+    #     # Selection(lambda x: x[3]),
+    #     MemoryScan(artifacts),
     # )))
     # assert t == (
-    #     ('Innocence (2014)',),
-    #     ('Rentun Ruusu (2001)',),
-    #     ('The Pirates (2014)',)
-    # ), f'got = {t}'
-    # print('ok 9')
+    #     ('horcrux1',),
+    #     ('horcrux2',),
+    #     ('lktpnsn',),
+    # )
+    # print('ok 1')
 
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[0], x[2])),
+    #     Limit(3),
+    #     Sort(lambda x: x[2], desc=True),
+    #     MemoryScan(artifacts),
+    # ))) == (
+    #     ('elderwd', 99.0),
+    #     ('philstn', 95.0),
+    #     ('horcrux1', 90.0),
+    # )
+    # print('ok 2')
+
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[1], x[2])),
+    #     Limit(3),
+    #     Sort(lambda x: x[2]),
+    #     Selection(lambda x: (not x[3]) and (60.0 <= x[2] < 90.0)),
+    #     MemoryScan(artifacts),
+    # ))) == (
+    #     ('Basilisk Fang', 60.0),
+    #     ('Invisibility Cloak', 70.0),
+    #     ('Time-Turner', 75.0),
+    # )
+    # print('ok 3')
+
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[0],)),
+    #     Selection(lambda x: ' of ' in x[1]),
+    #     MemoryScan(artifacts),
+    # ))) == (
+    #     ('sword',),
+    #     ('lktpnsn',),
+    # )
+    # print('ok 4')
+
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[0],)),
+    #     Limit(5),
+    #     Sort(lambda x: x[1]),
+    #     MemoryScan(artifacts),
+    # ))) == (
+    #     ('basilisk',),
+    #     ('elderwd',),
+    #     ('cloak',),
+    #     ('lktpnsn',),
+    #     ('mapmara',),
+    # )
+    # print('ok 5')
+
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[0],)),
+    #     Selection(lambda x: x[2] > 120.0),
+    #     MemoryScan(artifacts),
+    # ))) == ()
+    # print('ok 6')
+
+    # assert tuple(run(Q(
+    #     Projection(lambda x: (x[1],)),
+    #     Selection(lambda x: 'wand' in x[1].lower()),
+    #     MemoryScan(artifacts),
+    # ))) == (('Elder Wand',),)
+    # print('ok 7')
+
+
+    # with open('data/movies.csv', 'r', newline='', encoding='UTF-8') as inp:
+    #     r = csv.reader(inp)
+    #     next(inp) # skip header
+
+    #     t = tuple(run(Q(
+    #         Projection(lambda x: (x[1],)),
+    #         Limit(2),
+    #         FileScan(r),
+    #     )))
+    #     assert t == (
+    #         ('Toy Story (1995)',),
+    #         ('Jumanji (1995)',),
+    #     ), f'got = {t}'
+    #     print('ok 8')
+
+    # # t = tuple(run(Q(
+    # #     Projection(lambda x: (x[1],)),
+    # #     Limit(3),
+    # #     Sort(lambda x: x[0], desc=True),
+    # #     FileScanPaged('data/movies-paged.dat'),
+    # # )))
+    # # assert t == (
+    # #     ('Innocence (2014)',),
+    # #     ('Rentun Ruusu (2001)',),
+    # #     ('The Pirates (2014)',)
+    # # ), f'got = {t}'
+    # # print('ok 9')
+
+    schema = ['uint32', 'text', 'text']
     movies = [
-        [131266, 'Spiderman (2026)', 'Commedy|Drama|Fantasy|Sci-Fi'],
         [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'],
+        [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'],
+        [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'],
+        [131267, 'The Flower (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'],
     ]
-    file = "data/movies-paged-copy.dat" #
-    run(Q(Insert(file),
-          Selection(lambda x: "2025" in x[1]),
-          MemoryScan(movies)))
-    # read and check the last row
+    file = "data/movies-paged-copy.dat"
+    with open(file, 'r+b') as ip:
+        run(Q(
+            Insert(ip, schema),
+            # Selection(lambda x: 'Flower' in x[1]),
+            MemoryScan(movies)))
     last_row = []
-    with open(file, 'r') as f:
+    with open(file, 'r+b') as f:
         f.seek(-PAGE_SIZE, os.SEEK_END)
         buffer = f.read(PAGE_SIZE)
         rec_count = int.from_bytes(buffer[:2])
-        assert rec_count == 7
+        print('rec_count ', rec_count)
         p = 2
         rec_end = PAGE_SIZE
         for i in range(rec_count):
@@ -414,12 +405,15 @@ if __name__ == '__main__':
                     val = int.from_bytes(rec[:4]) # 4 bytes = 32 bit -> unsigned 32 bit int
                     row.append(val)
                     rec = rec[4:]
-                if typ == 'text':
+                elif typ == 'text':
                     l = int.from_bytes(rec[:1])
                     row.append(rec[1:1+l].decode('utf-8'))
                     rec = rec[1+l:]
-            res = row
+                else:
+                    raise ValueError('unknown type: ', typ)
+            last_row = row
+            print(row)
             p += 2
             rec_end = rec_start
-    assert last_row == [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi']
+    assert last_row == [131267, 'The Roses (2025)', 'Commedy|Dark|Fantasy|Sci-Fi'], f'{last_row}'
     print('ok - test_insert')

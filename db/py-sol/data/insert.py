@@ -57,26 +57,24 @@ def insert_single(ip, rec):
 
 
 file = "movies-paged-copy.dat"
-# insert(file, [
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-#     [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
-# ])
-# with open(file, 'r+b') as f:
-#     insert_single(f, [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"])
+insert(file, [
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+    [131265, "Superman (2025)", "Commedy|Drama|Fantasy|Sci-Fi"],
+])
 
 # test
 with open(file, "rb") as f:
