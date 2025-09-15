@@ -60,13 +60,13 @@ func (p *Projection) Next() Row {
 
 type Limit struct {
 	childAccessor
-	Limit int
+	L int
 }
 
 func (l *Limit) Next() Row {
-	if l.Limit <= 0 {
+	if l.L <= 0 {
 		return nil
 	}
-	l.Limit -= 1
+	l.L -= 1
 	return l.GetChild().Next()
 }

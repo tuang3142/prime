@@ -36,18 +36,19 @@ func TestMemoryScan(t *testing.T) {
 	}
 }
 
+func substr(col int, needle string) FilterFunc {
+	return func(r Row) bool {
+		s, _ := r[col].(string)
+		return strings.Contains(s, needle)
+	}
+}
+
 func TestSelection(t *testing.T) {
 	rows := []Row{
 		{1, "Harry J. Potter", "mage|orphan|main"},
 		{2, "Tom M. Riddle", "mage|orphan|also main, but evil"},
 		{3, "Hermione Granger", "mage|muggle-born|main"},
 		{4, "Severus Snape", "mage|professor"},
-	}
-	substr := func(col int, needle string) FilterFunc {
-		return func(r Row) bool {
-			s, _ := r[col].(string)
-			return strings.Contains(s, needle)
-		}
 	}
 
 	tests := []struct {
@@ -107,13 +108,35 @@ func TestProjection(t *testing.T) {
 
 	got := run(q(
 		&Projection{Mapper: mapper},
+		&Selection{Filter: substr(1, "H")},
 		&MemoryScan{Rows: rows},
 	))
 
 	want := []Row{
 		{"Harry", "Sly"},
 		{"Hermione", "Rav"},
-		{"Ron", "Huf"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("rows differ (-want +got):\n%s", diff)
+	}
+}
+
+func TestLimit(t *testing.T) {
+	rows := []Row{
+		{1, "Harry", "Potter", "Sly"},
+		{2, "Hermione", "Granger", "Rav"},
+		{3, "Ron", "Weasley", "Huf"},
+	}
+	mapper := func(r Row) Row { return Row{r[1], r[3]} }
+
+	got := run(q(
+		&Limit{L: 1},
+		&Projection{Mapper: mapper},
+		&MemoryScan{Rows: rows},
+	))
+
+	want := []Row{
+		{"Harry", "Sly"},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("rows differ (-want +got):\n%s", diff)
