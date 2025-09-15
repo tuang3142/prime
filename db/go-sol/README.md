@@ -12,3 +12,5 @@ module2: handling reading file, not loading everything from memory:
 - the trick is to read line by line, row by row, and not dump everything into the memory
 - tdb. note to self: its good that i sit in 2h in a row, but i could have done more, like archive a goal from the beginning
 - it s a good start, tho. i just need a goal, and not stray away from it
+
+module3: joint
