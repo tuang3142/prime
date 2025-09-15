@@ -53,20 +53,20 @@ func (f *CSVScan) Next() Row {
 	return row
 }
 
-type MemoryScan struct {
-	childAccessor
-	table []Row
-	i     int
-}
+// type MemoryScan struct {
+// 	childAccessor
+// 	table []Row
+// 	i     int
+// }
 
-func (m *MemoryScan) Next() Row {
-	if m.i >= len(m.table) {
-		return nil
-	}
-	row := m.table[m.i]
-	m.i++
-	return row
-}
+// func (m *MemoryScan) Next() Row {
+// 	if m.i >= len(m.table) {
+// 		return nil
+// 	}
+// 	row := m.table[m.i]
+// 	m.i++
+// 	return row
+// }
 
 type FilterFunc func(Row) bool
 
@@ -118,19 +118,6 @@ func (p *Projection) Next() Row {
 		return p.mapper(row)
 	}
 	return nil
-}
-
-type Limit struct {
-	childAccessor
-	limit int
-}
-
-func (l *Limit) Next() Row {
-	if l.limit <= 0 {
-		return nil
-	}
-	l.limit -= 1
-	return l.GetChild().Next()
 }
 
 type Sort struct {
