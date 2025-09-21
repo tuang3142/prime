@@ -1,27 +1,13 @@
 package queryexecutor
 
 import (
+	// "sort"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
-
-func run(head Node) []Row {
-	var result []Row
-	for row := head.Next(); row != nil; row = head.Next() {
-		result = append(result, row)
-	}
-	return result
-}
-
-func q(nodes ...Node) Node {
-	for i, node := range nodes[:len(nodes)-1] {
-		next := nodes[i+1]
-		node.SetChild(next)
-	}
-	return nodes[0]
-}
 
 func TestMemoryScan(t *testing.T) {
 	rows := []Row{
@@ -33,13 +19,6 @@ func TestMemoryScan(t *testing.T) {
 
 	if diff := cmp.Diff(rows, got); diff != "" {
 		t.Errorf("rows differ (-want +got):\n%s", diff)
-	}
-}
-
-func substr(col int, needle string) FilterFunc {
-	return func(r Row) bool {
-		s, _ := r[col].(string)
-		return strings.Contains(s, needle)
 	}
 }
 
@@ -108,13 +87,13 @@ func TestProjection(t *testing.T) {
 
 	got := run(q(
 		&Projection{Mapper: mapper},
-		&Selection{Filter: substr(1, "H")},
 		&MemoryScan{Rows: rows},
 	))
 
 	want := []Row{
 		{"Harry", "Sly"},
 		{"Hermione", "Rav"},
+		{"Ron", "Huf"},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("rows differ (-want +got):\n%s", diff)
@@ -140,5 +119,79 @@ func TestLimit(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("rows differ (-want +got):\n%s", diff)
+	}
+}
+
+func TestSort(t *testing.T) {
+	rows := []Row{
+		{4, "Draco", "Malfoy", "Sly"},
+		{1, "Harry", "Potter", "Sly"},
+		{2, "Hermione", "Granger", "Rav"},
+		{3, "Ron", "Weasley", "Huf"},
+	}
+	key := func(r Row) int {
+		id, ok := r[0].(int)
+		if !ok {
+			t.Fatalf("can't convert %v to int", r[0])
+		}
+		return id
+	}
+
+	got := run(q(
+		&Limit{L: 2},
+		&Sort{Key: key, desc: true},
+		&MemoryScan{Rows: rows},
+	))
+
+	want := []Row{
+		{4, "Draco", "Malfoy", "Sly"},
+		{3, "Ron", "Weasley", "Huf"},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("rows differ (-want +got):\n%s", diff)
+	}
+
+}
+
+func TestGroupBy(t *testing.T) {
+	rows := []Row{
+		{1, "Harry", "Gryffindor", 10},
+		{2, "Hermione", "Gryffindor", 12},
+		{3, "Draco", "Slytherin", 8},
+		{4, "Pansy", "Slytherin", 6},
+	}
+	sumPoints := func(rs []Row) Row {
+		sum := 0
+		for _, r := range rs {
+			val, ok := r[3].(int)
+			if !ok {
+				t.Fatalf("can't convert %v to int", r[3])
+			}
+			sum += val
+		}
+		return Row{sum}
+	}
+
+	got := run(q(
+		&GroupBy{groupId: 2, agg: sumPoints},
+		&MemoryScan{Rows: rows},
+	))
+	sort.Slice(got, func(i, j int) bool {
+		return got[i][0].(string) < got[j][0].(string)
+	})
+
+	want := []Row{
+		{"Gryffindor", 22}, // 10+12
+		{"Slytherin", 14},  // 8+6
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("rows differ (-want +got):\n%s", diff)
+	}
+}
+
+func substr(col int, needle string) FilterFunc {
+	return func(r Row) bool {
+		s, _ := r[col].(string)
+		return strings.Contains(s, needle)
 	}
 }

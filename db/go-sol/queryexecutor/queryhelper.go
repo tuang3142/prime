@@ -24,3 +24,7 @@ func Or(fs ...FilterFunc) FilterFunc {
 }
 
 type MapperFunc func(Row) Row
+
+type SortFunc func(Row) int
+
+type AggFunc func([]Row) Row
