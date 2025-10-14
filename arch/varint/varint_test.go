@@ -98,7 +98,7 @@ func Test_Decode(t *testing.T) {
 }
 
 func Test_EncodeThenDecode_LotsOfTime(t *testing.T) {
-	for i := 0; i < 1048576; i++ {
+	for i := 0; i < 1073741824; i++ {
 		if uint64(i) != Decode(Encode(uint64(i))) {
 			t.Fatalf("failed on %v", i)
 		}

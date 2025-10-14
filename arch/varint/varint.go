@@ -10,6 +10,10 @@ const (
 	hexChar  = "0123456789abcdef"
 )
 
+// TODO: perf
+// TODO: Support decoding of multiple adjacent varints
+// TODO: Understand and implement protobuf's sintN type using ZigZag encoding
+
 func Encode(n uint64) (out string) {
 	if n == 0 {
 		return "00"
