@@ -1,8 +1,6 @@
-module arch
+module termbell
 
-go 1.24.0
-
-toolchain go1.24.9
+go 1.24.9
 
 require golang.org/x/term v0.36.0
 
