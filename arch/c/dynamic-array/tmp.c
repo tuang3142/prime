@@ -2,80 +2,130 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// ensure safe memory leak or smt?
-const int INIT_SIZE = 10;  // could be 1?
+// TODO: ensure no memeory leak with valgrind
+#define STARTING_CAPACITY 8
+#define nptr ((void*)0)
 
-typedef struct DA {
-  int* arr;
-  int sz;
+typedef struct {
+  void** items;
+  int len;
+  int cap;
 } DA;
 
-DA* New() {  // does it need to be new(void)
-  // not size of DA*?
+DA* New() {
   DA* da = malloc(sizeof(DA));
   if (!da) return NULL;
 
-  // why not int*, watch supliment video
-  da->arr = calloc(INIT_SIZE, sizeof(int));
-  if (!da->arr) {
+  da->items = malloc(STARTING_CAPACITY * sizeof(void*));
+  if (!da->items) {
     free(da);
     return NULL;
   }
 
-  da->sz = 0;
+  da->len = 0;
+  da->cap = STARTING_CAPACITY;
+
+  return da;
 };
 
-void Append(DA* da, int n) {
-  da->arr[da->sz] = n;
-  // todo: alloc
-  da->sz++;
+void Free(DA* da) {
+  free(da->items);
+  free(da);
 }
 
-int Pop(DA* da) {
-  // do we need to "free" this memoery address?
-  int n = da->arr[da->sz - 1];
-  da->sz--;
-  return n;
+void Append(DA* da, void* x) {
+  if (da->len >= da->cap) {
+    da->cap *= 2;
+    da->items = realloc(da->items, da->cap * sizeof(void*));
+  }
+  da->items[da->len] = x;
+  da->len++;
 }
 
-int Get(DA* da, int i) {
-  if (i >= da->sz) return -1;
+void* Pop(DA* da) {
+  if (da->len == 0) {
+    return NULL;
+  }
 
-  return da->arr[i];
+  void* x = da->items[da->len - 1];
+  da->len--;
+
+  if (da->len < da->cap / 4) {
+    da->cap /= 2;
+    da->items = realloc(da->items, da->cap * sizeof(void*));
+  }
+
+  return x;
 }
 
-void Set(DA* da, int i, int n) {
-  if (i >= da->sz) return;
+void* Get(DA* da, int i) {
+  if (i >= da->len) return NULL;
 
-  da->arr[i] = n;
+  return da->items[i];
 }
 
-int Size(DA* da) { return da->sz; }
+void Set(DA* da, void* x, int i) {
+  if (i >= da->len) return;
 
-void Free(DA* da) { free(da); }
+  da->items[i] = x;
+}
+
+int Size(DA* da) { return da->len; }
 
 int main() {
   DA* da = New();
+
   assert(Size(da) == 0);
 
-  Append(da, 10);
-  Append(da, 20);
-  Append(da, 30);
-  assert(Size(da) == 3);
-
-  assert(Get(da, 0) == 10);
-  assert(Get(da, 1) == 20);
-  assert(Get(da, 2) == 30);
-
-  int p = Pop(da);
-  assert(p == 30);
+  // basic push and pop test
+  int x = 5;
+  float y = 12.4;
+  Append(da, &x);
+  Append(da, &y);
   assert(Size(da) == 2);
 
-  Set(da, 0, 777);
-  assert(Get(da, 0) == 777);
-  assert(Size(da) == 2);
+  assert(Pop(da) == &y);
+  assert(Size(da) == 1);
+
+  assert(Pop(da) == &x);
+  assert(Size(da) == 0);
+  assert(Pop(da) == NULL);
+
+  // basic set/get test
+  Append(da, &x);
+  Set(da, &y, 0);
+  assert(Get(da, 0) == &y);
+  Pop(da);
+  assert(Size(da) == 0);
+
+  // expansion test
+  DA* da2 = New();  // use another DA to show it doesn't get overriden
+  Append(da2, &x);
+  int i, n = 100 * STARTING_CAPACITY, arr[n];
+  for (i = 0; i < n; i++) {
+    arr[i] = i;
+    Append(da, &arr[i]);
+  }
+  assert(Size(da) == n);
+  for (i = 0; i < n; i++) {
+    assert(Get(da, i) == &arr[i]);
+  }
+  for (; n; n--) Pop(da);
+  assert(Size(da) == 0);
+  assert(Pop(da2) == &x);  // this will fail if da doesn't expand
 
   Free(da);
-
+  Free(da2);
   printf("OK\n");
 }
+
+// TODO: test this
+// typedef struct {
+//   int x;
+//   float y;
+// } Foo;
+// Foo* food = malloc(10 * sizeof(Foo));
+// for (int i = 0; i < 10; i++) {
+//   food[i]->x = i;
+//   food[i]->y = float(i) * 0.2;
+// }

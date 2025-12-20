@@ -1,34 +1,35 @@
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-bool ispangram(char* s) {
-  int seen[26] = {0};
-  for (; *s != '\0'; s++) {
-    if ('a' <= *s && *s <= 'z') {
-      seen[*s - 'a']++;
+# TODO: need to learn about asccii text and 0x1f?
+int ispangram(char* s) {
+  uint32_t bitmap = 0;
+  char c;
+  while ((c=*s++) != '\0') {
+    if (c < '@') {
+      continue;
     }
-    if ('A' <= *s && *s <= 'Z') {
-      seen[*s - 'A']++;
-    }
+    int shift = c - (c >= 'a' ? 'a' : 'A');
+    bitmap |= (1 << shift);
   }
-  int cnt = 0;
-  for (int i = 0; i < 26; i++) {
-    cnt += seen[i];
-  }
-  return cnt == 26;
+
+  return bitmap == 0x3FFFFFF;
 }
 
 int main() {
   size_t len;
   size_t read;
-  // ssize_t read;
   char* line = NULL;
   while ((read = getline(&line, &len, stdin)) != -1) {
-    if (ispangram(line)) printf("%s", line);
+    if (ispangram(line)) {
+      printf("%s", line);
+    }
   }
 
-  if (ferror(stdin)) fprintf(stderr, "Error reading from stdin");
+  if (ferror(stdin)) {
+    fprintf(stderr, "Error reading from stdin");
+  }
 
   free(line);
   fprintf(stderr, "ok\n");
