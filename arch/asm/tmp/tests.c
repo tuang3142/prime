@@ -1,11 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 
-extern int sum(int a, int b);
-
+extern char foo(char* s);
 
 int main(void) {
-  assert(sum(123, 321) == 444);
-
+  printf("%d\n", foo("1234"));
   printf("OK\n");
 }

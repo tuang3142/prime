@@ -1,8 +1,21 @@
 section .text
 
-global sum
+global foo
 
-sum:
-	mov rax, rdi
-	add rax, rsi
+foo:
+	xor rax, rax
+
+.loop:
+	movzx rcx, byte [rdi]
+	cmp   rcx, 0
+	je    .loop_end
+	inc   rdi
+	sub   rcx, '0'
+	add   rax, rcx
+	jmp   .loop
+
+.loop_end:
+	; cmp rax, 10
+	; sete al
+	; movzx rax, al
 	ret

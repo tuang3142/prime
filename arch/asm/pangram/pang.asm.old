@@ -1,0 +1,33 @@
+section .text
+global  pangram
+
+pangram:
+	xor rax, rax; bitmap = 0
+	xor rbx, rbx
+	mov rbx, 0x03ffffff;; (1<<26) - 1
+
+.loop:
+	movzx rcx, byte [rdi];; c = *s; s++
+	cmp   rcx, 0;; if c == '\0'
+	je    .loop_end
+	cmp   rcx, 'a'
+	jae   .if_lower_case;; if c >= 'a'; use jae for unsigned compare
+	jmp   .elif_upper_case
+
+.if_lower_case:
+	sub rcx, 'a'
+	jmp .if_end
+
+.elif_upper_case:
+	sub rcx, 'A'
+
+.if_end:
+	mov rdx, 1
+	shl rdx, cl;; 1 << c - 'a' (or 'A')
+	xor rax, rdx
+
+.loop_end:
+	cmp   rax, rbx
+	sete  al
+	movzx rax, al
+	ret

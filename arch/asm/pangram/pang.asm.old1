@@ -1,0 +1,31 @@
+section .text
+global  pangram
+
+pangram:
+	xor rax, rax
+	mov rbx, 0x03ffffff; bit map for 26 chars
+
+.loop:
+	movzx rcx, byte [rdi]; loop through *s
+	cmp   rcx, 0; break if '\0'
+	je    .loop_end
+	inc   rdi
+	cmp   rcx, 'a'
+	jge   .if_lower_case
+	sub   rcx, 'A'
+	jmp   .end_if_lower_case
+
+.if_lower_case:
+	sub rcx, 'a'; sub rcx for a
+
+.end_if_lower_case:
+	mov rdx, 1
+	shl rdx, cl; rdx = 1<<rcx
+	or  rax, rdx
+	jmp .loop
+
+.loop_end:
+	cmp   rax, rbx
+	sete  al
+	movzx rax, al
+	ret
