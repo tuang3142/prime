@@ -40,7 +40,7 @@ original doc: [avenger, assemble](https://github.com/hackclub/some-assembly-requ
   - CPU knows how to map `1` to `add`.
   - CPU -> send (1, 4, 4) to ALU -> ALU return 8 -> CPU store 8 to r12.
 
-### physic (TODO - I skipped this part)
+### physic (TODO: p2 - I skipped this part)
 
 - 1 = on (high voltage, low resistant), 0 = off (high resistant, low voltage)
 - bus???
@@ -78,3 +78,14 @@ original doc: [avenger, assemble](https://github.com/hackclub/some-assembly-requ
 ### flags
 
 - zero flag `ZF`: add, sub, etc. writes to this flag; jump instruction reads this flag
+
+### condition - `jmp`
+
+- can be use for loop, branching
+
+### function
+
+- `call` and `ret`; similar to jump but more elegant?:
+  - ah, the ever familar: `stack` - physically in RAM
+  - temporary save result in the stack - push and pop - like a bookmark of where to return to after function is called
+    - call pushed address A (of the instruction below it into the stack), ret pop A
