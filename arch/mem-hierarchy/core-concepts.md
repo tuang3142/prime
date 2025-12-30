@@ -1,0 +1,4 @@
+- cache line - 64 bit chunk
+- cache level - l1 to l4
+- python is slow due to pointer chase:
+ - it has to use lots of pointers -> more round trips for CPU to go to RAM.
